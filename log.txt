@@ -1,7 +1,15 @@
 20130207
 ----------
 重構，把舊有功能完成
-
+解決了一些 bug
+term_comm 的 wait=True 是要確定畫面會更新才要加
+不然有些狀況畫面不變的話，MochiCake 會 hang 住
+現在已經可以下指令了，做了三個指令：logout, hello 和 reload
+也更改了目錄結構
+魚檔案用純文字而不用 pickle，以便直接 tail -f
+記錄檔還沒製作，正在考慮必要性
+加上了 .gitignore，今天不小心把 MochiCake.conf 給 push 上 github 了
+裡面可是有帳號密碼啊ww
 
 20130206
 ----------
