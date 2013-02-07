@@ -7,16 +7,20 @@
 python MochiCake.py
 
 ## 設定檔 ##
-user:pi
-passwd:72ab8af5
-master:pi314
-board:P_pi314
+.   檔名
+    MochiCake.conf
+.   內容
+    user:pi
+    passwd:72ab8af5
+    master:pi314
+    board:P_pi314
 
+使用 "#" 開頭當成註解
 user 和 passwd 為 MochiCake 使用的帳號
 master 為可以對 MochiCake 下指令的人
 board 為一登入後會進入的板名
 
-若無設定檔或設定檔格式錯誤則離開程式不執行
+若無設定檔或設定檔格式錯誤則發出對應的訊息，下述
 
 ## 檔案結構 ##
 所有看到的魚都放在 fishes/ 中
@@ -48,4 +52,10 @@ board 為一登入後會進入的板名
     如果使用者回 [MochiCake]:no
     則會更改故鄉為 "動作取消~"
     然後取消動作
-.   以上字串都是暫定，以後可以都會加入設定檔
+.   以上字串都是暫定，以後可能都會加入設定檔
+.   記錄檔
+    MochiCake.log
+
+## 各種訊號 ##
+.   ConfSyntaxError
+    設定檔語法錯誤
