@@ -55,6 +55,7 @@ def genExampleConfFile ():
     print '完成, 請先完成設定檔'
 
 def checkLackArgument ():
+    global CONST
     lack = []
     for i in ['USER', 'PASSWD', 'MASTER', 'BOARD']:
         if not i in CONST:
@@ -107,55 +108,59 @@ def term_comm (w=None, wait=None):
 	time.sleep(1)
 	return ret
 
-def login(user, passwd):
+def login():
+    global CONST
     print '登入中...'
     s = term_comm().split('\n')
     while True:
         s = term_comm()
         if s.find('[您的帳號]') != -1:
-            term_comm('%s\r' % user, wait=True)
+            term_comm('%s\r' % CONST['USER'])
             break
     while True:
         s = term_comm()
         if s.find('[您的密碼]') != -1:
-            term_comm('%s\r' % passwd, wait=True)
+            term_comm('%s\r' % CONST['PASSWD'])
             break
     '''跳過進板公佈欄'''
-    term_comm('    ', wait=True)
+    term_comm('    ')
     print '完成'
 
-def enterBoard (board):
+def enterBoard ():
+    global position
     print '離開使用者名單'
-    term_comm('\x1b\x5b\x44', wait=True)
+    term_comm('\x1b\x5b\x44')
 
-    print '進入看板 %s' % board
-    term_comm('\x73%s\n' % board)
+    print '進入看板 %s' % position
+    term_comm('\x73%s\n' % position)
 
     print '完成'
-    loadFishList(board)
+    loadFishList()
 
     print '打開使用者名單...'
-    term_comm('\x15', wait=True)
+    term_comm('\x15')
     print '完成'
 
-def loadFishList (board):
+def loadFishList ():
     global fishList
-    print '載入記錄 (fishes/%s)...' % board
+    global position
+    print '載入記錄 (fishes/%s)...' % position
 
     if not os.path.exists('fishes'):
         os.mkdir('fishes')
     if not os.path.isdir('fishes'):
         os.rename('fishes', 'fishes.tmp')
 
-    open('fishes/'+board, 'a').close()
+    open('fishes/'+position, 'a').close()
     fishList = []
-    with open('fishes/'+board, 'r') as fishes:
+    with open('fishes/'+position, 'r') as fishes:
         fishList = [i.strip() for i in fishes]
     for i in fishList:
         print i
     print '完成'
 
 def checkNewFish (lines):
+    global CONST
     global fishList
     for line in lines[3:]:
         fishID = line[8:20].strip()
@@ -169,53 +174,83 @@ def checkNewFish (lines):
             fishes.write(fishID+'\n')
             fishes.close()
 
-def responce (s):
+def listFishes ():
+    global CONST
+    global position
+    global fishList
+    response('[準備中]')
+    term_comm('\x1b\x5b\x44')
+    term_comm('\x1b\x5b\x44')
+    term_comm('\x1b\x5b\x44')
+    term_comm('\x1b\x5b\x44')
+    term_comm('\x1b\x5b\x44')
+    term_comm('\x1b\x5b\x44')
+    print '進入寄信選單'
+    term_comm('m\nm\n')
+    print '完成'
+
+    print '收信人:'+CONST['MASTER']
+    term_comm(CONST['MASTER']+'\n') #收信人
+    term_comm('[名單] '+position+'\n')
+    
+    for i in fishList:
+        term_comm(i+'\n')
+    
+    term_comm('\x18\n\n\n')         #寄信，備份就擺著吧
+    term_comm('\x15')    #打開使用者名單
+    enterBoard()
+
+def response (s):
     global lastResponce
     if lastResponce != s:
         print '更改故鄉為'+s
-        term_comm('\x06\x03'+s+'\n', wait=True)
+        term_comm('\x06\x03'+s+'\n')
         print '完成'
         lastResponce = s
 
-def onReceiveCommand (cmd):
+def onReceiveCommand (cmd, lines):
     global state
     if state == 'WAIT_COMMAND':
-        if cmd in ['[logout]', '[reload]']:
-            responce('[收到~ 再次確認~]')
+        if cmd in ['[logout]', '[reload]', '[list]']:
+            response('[收到~ 再次確認~]')
             state = 'WAIT_CONFIRM'
         elif cmd == '[hello]':
-            responce('[哈囉>ω<]')
+            response('[哈囉>ω<]')
     elif state == 'WAIT_CONFIRM':
         if cmd == '[ok]':
             if lastCmd == '[logout]':
                 logout()
             elif lastCmd == '[reload]':
-                enterBoard(position)
+                enterBoard()
+            elif lastCmd == '[list]':
+                listFishes()
+            response('[動作完成~]')
             state = 'WAIT_COMMAND'
         elif cmd == '[no]':
-            responce('[動作取消~]')
+            response('[動作取消~]')
             state = 'WAIT_COMMAND'
         else:
             pass
 
-def checkCommand (user, master, lines):
+def checkCommand (lines):
+    global CONST
     global lastCmd
     for line in lines[3:]:
         fishID = line[8:20].strip()
-        if fishID == master:
+        if fishID == CONST['MASTER']:
             words = line.split()
             if words[-2].startswith('[') and words[-2].endswith(']'):
                 cmd = ' '.join(words[-2].split(':'))
                 if lastCmd != cmd:
                     print '接收到指令 '+cmd
-                    onReceiveCommand(cmd)
+                    onReceiveCommand(cmd, lines)
                     lastCmd = cmd
             else:
-                responce('[看魚~]')
+                response('[看魚~]')
             break;
 
 def logout ():
-    responce('[登出中~]')
+    response('[登出中~]')
     print '登出中...'
     '''左左左左左'''
     term_comm('\x1b\x5b\x44')
@@ -247,11 +282,11 @@ if __name__ == '__main__' or True:
 
     conn = telnetlib.Telnet("bs2.to")
 
-    login(CONST['USER'], CONST['PASSWD'])
-    term_comm('\x15', wait=True)
+    login()
+    term_comm('\x15')   #打開使用者名單
 
     position = CONST['BOARD']
-    enterBoard(position)
+    enterBoard()
 
     print '開始看魚'
     try:
@@ -260,7 +295,7 @@ if __name__ == '__main__' or True:
             scr = term_comm('s',wait=True)
             lines = scr.split("\n")
             checkNewFish(lines)
-            checkCommand(CONST['USER'], CONST['MASTER'], lines)
+            checkCommand(lines)
     except KeyboardInterrupt:
         print '\n接收到 ^C 按鍵'
         logout()
