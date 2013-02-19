@@ -38,6 +38,12 @@ board 為一登入後會進入的板名
     重新載入魚名單
 .   list
     把魚名單用水球丟給 master, 約 5 個 ID 一行
+.   seen:{ID}
+    查詢該板是否有出現過 {ID}，回應 yes 或 no
+.   where
+    回應該板的板名
+.   go:{BOARD}
+    離開當前的板，進入 {BOARD}，再打開使用者名單
 .   bye
     "[掰掰~ 請慢走~]"
 .   play

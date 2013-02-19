@@ -1,5 +1,18 @@
-20130207
-----------
+# 20120218 #
+編寫了一個函式 flatList
+可以把 string list 依照欄數排好
+用來輸出魚名單
+增加 where 指令，用來回應 master MochiCake 所在的板
+增加 seen 指令，格式為 [seen:{ID}]，用來回應 MochiCake 所在的板有沒有看過 {ID}
+seen 指令是第一個有參數的指令
+
+# 20130217 #
+增加 list 指令
+一樣需要用 ok 做確認
+確認後，MochiCake 會把該板的魚名單用站內信寄給 master
+但目前是一個 ID 一行，而不是 5 個 ID 一行
+
+# 20130207 #
 重構，把舊有功能完成
 解決了一些 bug
 term_comm 的 wait=True 是要確定畫面會更新才要加
@@ -11,8 +24,7 @@ term_comm 的 wait=True 是要確定畫面會更新才要加
 加上了 .gitignore，今天不小心把 MochiCake.conf 給 push 上 github 了
 裡面可是有帳號密碼啊ww
 
-20130206
-----------
+# 20130206 #
 可以監看使用者名單
 找出沒看過的板伴並加入檔案中
 目錄結構未定

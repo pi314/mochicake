@@ -141,6 +141,15 @@ def enterBoard ():
     term_comm('\x15')
     print '完成'
 
+def flatList (inputList, width):
+    maxLength = max([len(i) for i in inputList])
+    ret = []
+    for i in range(0, len(inputList), width):
+        tempList = [j for j in inputList[i:width+i]]
+        tempStr = ' '.join(['{0:{width}}'.format(j, width=maxLength) for j in tempList])
+        ret.append(tempStr)
+    return ret
+
 def loadFishList ():
     global fishList
     global position
@@ -155,7 +164,7 @@ def loadFishList ():
     fishList = []
     with open('fishes/'+position, 'r') as fishes:
         fishList = [i.strip() for i in fishes]
-    for i in fishList:
+    for i in flatList(fishList, 5):
         print i
     print '完成'
 
@@ -193,29 +202,45 @@ def listFishes ():
     term_comm(CONST['MASTER']+'\n') #收信人
     term_comm('[名單] '+position+'\n')
     
-    for i in fishList:
+    for i in flatList(fishList, 5):
         term_comm(i+'\n')
     
     term_comm('\x18\n\n\n')         #寄信，備份就擺著吧
     term_comm('\x15')    #打開使用者名單
     enterBoard()
 
+def seenFish (s):
+    global fishList
+    global position
+    print 'master 查詢 ' + s + ' @ ' + position
+    if s in fishList:
+        response('[是]')
+    else:
+        response('[否]')
+
 def response (s):
     global lastResponce
     if lastResponce != s:
-        print '更改故鄉為'+s
+        print '更改故鄉為 '+s
         term_comm('\x06\x03'+s+'\n')
         print '完成'
         lastResponce = s
 
 def onReceiveCommand (cmd, lines):
     global state
+    global position
     if state == 'WAIT_COMMAND':
         if cmd in ['[logout]', '[reload]', '[list]']:
             response('[收到~ 再次確認~]')
             state = 'WAIT_CONFIRM'
         elif cmd == '[hello]':
             response('[哈囉>ω<]')
+        elif cmd == '[ok]':
+            response('[看魚~]');
+        elif cmd == '[where]':
+            response('['+position+']');
+        elif cmd.startswith('[seen '):
+            seenFish(cmd[6:-1])
     elif state == 'WAIT_CONFIRM':
         if cmd == '[ok]':
             if lastCmd == '[logout]':
@@ -237,9 +262,12 @@ def checkCommand (lines):
     global lastCmd
     for line in lines[3:]:
         fishID = line[8:20].strip()
+        #找到 master, 看有沒有指令
         if fishID == CONST['MASTER']:
             words = line.split()
             if words[-2].startswith('[') and words[-2].endswith(']'):
+                # cmd 會被處理成 [cmd arg1 arg2 arg3 ...] 格式
+                # 而不是 [cmd:arg1:arg2:arg3:...] 格式
                 cmd = ' '.join(words[-2].split(':'))
                 if lastCmd != cmd:
                     print '接收到指令 '+cmd
