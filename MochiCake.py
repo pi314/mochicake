@@ -6,6 +6,7 @@ import telnetlib
 import time
 import pyte
 import os
+import random
 
 CONST = {}
 fishList = []
@@ -124,6 +125,7 @@ def login():
             break
     '''跳過進板公佈欄'''
     term_comm('    ')
+    term_comm('\x15')   #打開使用者名單
     print '完成'
 
 def enterBoard ():
@@ -212,11 +214,11 @@ def listFishes ():
 def seenFish (s):
     global fishList
     global position
-    print 'master 查詢 ' + s + ' @ ' + position
+    print 'Master 查詢 ' + s + ' @ ' + position
     if s in fishList:
-        response('[是]')
+        response('[是的, 有看過喔~]')
     else:
-        response('[否]')
+        response('[不, 沒有看過~]')
 
 def response (s):
     global lastResponce
@@ -226,9 +228,9 @@ def response (s):
         print '完成'
         lastResponce = s
 
-def onReceiveCommand (cmd, lines):
-    global state
-    global position
+def processCommandFromMaster (cmd, lines):
+    global state, position, lastCmd
+    print '接收到指令 '+cmd
     if state == 'WAIT_COMMAND':
         if cmd in ['[logout]', '[reload]', '[list]']:
             response('[收到~ 再次確認~]')
@@ -239,8 +241,10 @@ def onReceiveCommand (cmd, lines):
             response('[看魚~]');
         elif cmd == '[where]':
             response('['+position+']');
-        elif cmd.startswith('[seen '):
+        elif cmd.startswith('[seen:'):
             seenFish(cmd[6:-1])
+        else:
+            response('[不懂>"<]')
     elif state == 'WAIT_CONFIRM':
         if cmd == '[ok]':
             if lastCmd == '[logout]':
@@ -255,7 +259,30 @@ def onReceiveCommand (cmd, lines):
             response('[動作取消~]')
             state = 'WAIT_COMMAND'
         else:
+            response('[不懂>"<]')
             pass
+    lastCmd = cmd
+
+def processCommandFromShell (cmd):
+    if cmd == 'cmds':
+        print '''
+cmds     : 列出所有指令
+logout   : MochiCake 登出 (exit)
+position : 印出 MochiCake 所在板名 (pos)
+list     : 列出當前魚名單 (ls)
+'''
+    elif cmd == 'logout' or cmd == 'exit':
+        logout()
+        exit()
+    elif cmd == '':
+        print '無輸入指令，繼續看魚'
+        return 'BACK_SEE_FISH'
+    elif cmd == 'position' or cmd == 'pos':
+        print '目前位置 : '+position
+    elif cmd == 'list' or cmd == 'ls':
+        for i in flatList(fishList, 5):
+            print i
+    return 'CONTINUE'
 
 def checkCommand (lines):
     global CONST
@@ -266,16 +293,13 @@ def checkCommand (lines):
         if fishID == CONST['MASTER']:
             words = line.split()
             if words[-2].startswith('[') and words[-2].endswith(']'):
-                # cmd 會被處理成 [cmd arg1 arg2 arg3 ...] 格式
-                # 而不是 [cmd:arg1:arg2:arg3:...] 格式
-                cmd = ' '.join(words[-2].split(':'))
+                cmd = words[-2]
                 if lastCmd != cmd:
-                    print '接收到指令 '+cmd
-                    onReceiveCommand(cmd, lines)
-                    lastCmd = cmd
+                    return cmd
             else:
                 response('[看魚~]')
-            break;
+            break
+    return 'NO_CMD'
 
 def logout ():
     response('[登出中~]')
@@ -297,11 +321,34 @@ def logout ():
         pass
     exit()
 
-if __name__ == '__main__' or True:
+def watch ():
+    while True:
+        scr = term_comm('s',wait=True)
+        lines = scr.split("\n")
+        checkNewFish(lines)
+        cmd = checkCommand(lines)
+        if cmd != 'NO_CMD':
+            return cmd, lines
+
+def commandLineInterface ():
+    print '進入指令模式，輸入 cmds 查看指令列表'
+    while True:
+        try:
+            cmd = raw_input('MochiCake > ').strip()
+            result = processCommandFromShell(cmd)
+            if result == 'BACK_SEE_FISH':
+                return
+        except KeyboardInterrupt:
+            print '再度接收到 ^C 按鍵，登出'
+            logout()
+    
+def main ():
+    global conv, stream, screen, conn
+    global position, CONST
     prepareConf()
 
     #big5(含uao)，去雙色字，轉utf-8
-    conv=bsdconv.Bsdconv("ansi-control,byte:big5-defrag:byte,ansi-control|skip,big5:utf-8,bsdconv_raw")
+    conv = bsdconv.Bsdconv("ansi-control,byte:big5-defrag:byte,ansi-control|skip,big5:utf-8,bsdconv_raw")
     conv.init()
     stream = pyte.Stream()
     screen = pyte.Screen(80, 24)
@@ -310,21 +357,19 @@ if __name__ == '__main__' or True:
 
     conn = telnetlib.Telnet("bs2.to")
 
-    login()
-    term_comm('\x15')   #打開使用者名單
+    login() #登入並進入使用者名單
 
     position = CONST['BOARD']
     enterBoard()
-
-    print '開始看魚'
-    try:
-        '''抓魚'''
-        while True:
-            scr = term_comm('s',wait=True)
-            lines = scr.split("\n")
-            checkNewFish(lines)
-            checkCommand(lines)
-    except KeyboardInterrupt:
-        print '\n接收到 ^C 按鍵'
-        logout()
+    while True:
+        try:
+            # 查看使用者名單，直到有指令出現
+            cmd, lines = watch()
+            processCommandFromMaster(cmd, lines)
+        except KeyboardInterrupt:
+            print '\n接收到 ^C 按鍵，MochiCake 暫停'
+            commandLineInterface()
     exit()
+
+if __name__ == '__main__' or True:
+    main()
