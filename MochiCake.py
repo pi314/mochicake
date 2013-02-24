@@ -12,7 +12,7 @@ CONST = {}
 fishList = []
 lastCmd = ''
 state = 'WAIT_COMMAND'
-lastResponce = ''
+lastState = ''
 position = ''
 
 def loadConf ():
@@ -166,8 +166,11 @@ def loadFishList ():
     fishList = []
     with open('fishes/'+position, 'r') as fishes:
         fishList = [i.strip() for i in fishes]
-    for i in flatList(fishList, 5):
-        print i
+    if len(fishList) == 0:
+        print '名單為空'
+    else:
+        for i in flatList(fishList, 5):
+            print i
     print '完成'
 
 def checkNewFish (lines):
@@ -189,7 +192,7 @@ def listFishes ():
     global CONST
     global position
     global fishList
-    response('[準備中]')
+    showState('準備中')
     term_comm('\x1b\x5b\x44')
     term_comm('\x1b\x5b\x44')
     term_comm('\x1b\x5b\x44')
@@ -210,56 +213,85 @@ def listFishes ():
     term_comm('\x18\n\n\n')         #寄信，備份就擺著吧
     term_comm('\x15')    #打開使用者名單
     enterBoard()
+    showState('完成')
 
 def seenFish (s):
     global fishList
     global position
     print 'Master 查詢 ' + s + ' @ ' + position
     if s in fishList:
-        response('[是的, 有看過喔~]')
+        response('是的, 有看過喔~')
     else:
-        response('[不, 沒有看過~]')
+        # 沒有完全相同的 ID
+        for i in fishList:
+            if i.startswith(s) or i.endswith(s):
+                response('沒有看過，不過有看過 '+i+' 喔')
+                return
+        response('不, 沒有看過~')
+def removeFish (s):
+    global fishList
+    global position
+    f = lambda x : not x == s
+    fishList = [i for i in fishList if f(i)]
+    with open('fishes/'+position, 'w') as fishes:
+        fishes.write('\n'.join(fishList)+'\n')
 
-def response (s):
-    global lastResponce
-    if lastResponce != s:
+def showState (s):
+    global lastState
+    if lastState != s:
         print '更改故鄉為 '+s
         term_comm('\x06\x03'+s+'\n')
         print '完成'
-        lastResponce = s
+        lastState = s
+
+def response (s):
+    term_comm('\x12'+s+'\n\n')
+    # 把水球按掉，不然畫面不會變
+    term_comm('s')
+    return
 
 def processCommandFromMaster (cmd, lines):
     global state, position, lastCmd
     print '接收到指令 '+cmd
     if state == 'WAIT_COMMAND':
-        if cmd in ['[logout]', '[reload]', '[list]']:
-            response('[收到~ 再次確認~]')
+        if cmd in ['list']:
+            response('收到~ 再次確認~')
             state = 'WAIT_CONFIRM'
-        elif cmd == '[hello]':
-            response('[哈囉>ω<]')
-        elif cmd == '[ok]':
-            response('[看魚~]');
-        elif cmd == '[where]':
-            response('['+position+']');
-        elif cmd.startswith('[seen:'):
-            seenFish(cmd[6:-1])
+        elif cmd == 'hello':
+            response('哈囉>ω<')
+        elif cmd == 'ok':
+            showState('看魚~');
+        elif cmd == 'where':
+            response(position);
+        elif cmd.startswith('seen '):
+            seenFish(cmd[5:])
+        elif cmd == 'logout':
+            logout()
+        elif cmd == 'reload':
+            enterBoard()
+        elif cmd.startswith('remove '):
+            removeFish(cmd[7:])
+            response('刪除 '+s+' 完成~')
+        elif cmd.startswith('goto '):
+            response('前往 '+cmd[5:]+'!')
+            position = cmd[5:]
+            enterBoard()
+            response('到達!')
         else:
-            response('[不懂>"<]')
+            response('不懂>"<')
     elif state == 'WAIT_CONFIRM':
-        if cmd == '[ok]':
-            if lastCmd == '[logout]':
+        if cmd == 'ok':
+            if lastCmd == 'logout':
                 logout()
-            elif lastCmd == '[reload]':
-                enterBoard()
-            elif lastCmd == '[list]':
+            elif lastCmd == 'list':
                 listFishes()
-            response('[動作完成~]')
+            response('動作完成~')
             state = 'WAIT_COMMAND'
-        elif cmd == '[no]':
-            response('[動作取消~]')
+        elif cmd == 'no':
+            response('動作取消~')
             state = 'WAIT_COMMAND'
         else:
-            response('[不懂>"<]')
+            response('不懂>"<')
             pass
     lastCmd = cmd
 
@@ -267,14 +299,19 @@ def processCommandFromShell (cmd):
     if cmd == 'cmds':
         print '''
 cmds     : 列出所有指令
-logout   : MochiCake 登出 (exit)
+exit     : MochiCake 繼續看魚
+logout   : MochiCake 登出
 position : 印出 MochiCake 所在板名 (pos)
 list     : 列出當前魚名單 (ls)
+where    : 印出當前所在板名
+reload   : 重新載入該板的魚名單
+remove   : 從名單中刪除一些魚 (rm)
+           remove fish1 fish2 ...
 '''
-    elif cmd == 'logout' or cmd == 'exit':
+    elif cmd == 'logout':
         logout()
         exit()
-    elif cmd == '':
+    elif cmd == '' or cmd == 'exit':
         print '無輸入指令，繼續看魚'
         return 'BACK_SEE_FISH'
     elif cmd == 'position' or cmd == 'pos':
@@ -282,27 +319,36 @@ list     : 列出當前魚名單 (ls)
     elif cmd == 'list' or cmd == 'ls':
         for i in flatList(fishList, 5):
             print i
+    elif cmd == 'where':
+        print position
+    elif cmd == 'reload':
+        loadFishList()
+    elif cmd.startswith('remove '):
+        for i in cmd.split()[1:]:
+            removeFish(i)
+            print '刪除 '+i+'完成'
+    else:
+        print '未知的指令'
     return 'CONTINUE'
 
 def checkCommand (lines):
     global CONST
-    global lastCmd
     for line in lines[3:]:
         fishID = line[8:20].strip()
         #找到 master, 看有沒有指令
         if fishID == CONST['MASTER']:
             words = line.split()
-            if words[-2].startswith('[') and words[-2].endswith(']'):
-                cmd = words[-2]
-                if lastCmd != cmd:
-                    return cmd
+            if words[-2] == 'MochiCake':
+                return True
             else:
-                response('[看魚~]')
+                return False
             break
-    return 'NO_CMD'
+    # 沒有找到 MASTER
+    return False
 
 def logout ():
-    response('[登出中~]')
+    showState('登出中~')
+    exit()
     print '登出中...'
     '''左左左左左'''
     term_comm('\x1b\x5b\x44')
@@ -322,14 +368,37 @@ def logout ():
     exit()
 
 def watch ():
+    global CONST
+    showState('看魚~')
     while True:
+        scr = term_comm()
+        lines = scr.split("\n")
+        if lines[-1].startswith('★'+CONST['MASTER']):
+            return
         scr = term_comm('s',wait=True)
         lines = scr.split("\n")
+        if lines[-1].startswith('★'+CONST['MASTER']):
+            return
+        while not lines[3].startswith('     1'):
+            print '使用者名單的位置錯誤，試著回到第一頁'
+            term_comm('1\n')
         checkNewFish(lines)
-        cmd = checkCommand(lines)
-        if cmd != 'NO_CMD':
-            return cmd, lines
+        if checkCommand(lines):
+            return 
 
+def waitCommand ():
+    global CONST
+    showState('待命!')
+    while True:
+        scr = term_comm()
+        lines = scr.split("\n")
+        if lines[-1].startswith('★'+CONST['MASTER']):
+            # 有水球！
+            cmd = ' '.join(lines[-1].split()[1:])
+            if cmd == 'end':
+                return
+            processCommandFromMaster(cmd, lines)
+    
 def commandLineInterface ():
     print '進入指令模式，輸入 cmds 查看指令列表'
     while True:
@@ -363,9 +432,9 @@ def main ():
     enterBoard()
     while True:
         try:
-            # 查看使用者名單，直到有指令出現
-            cmd, lines = watch()
-            processCommandFromMaster(cmd, lines)
+            # 查看使用者名單，直到 Master 提出指示 (MochiCake)
+            watch()
+            waitCommand()
         except KeyboardInterrupt:
             print '\n接收到 ^C 按鍵，MochiCake 暫停'
             commandLineInterface()
