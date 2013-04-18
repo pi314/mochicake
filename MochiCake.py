@@ -129,7 +129,7 @@ class MochiCakeBot (object):
         currentFishList = []
         for line in self.lines[3:]:
             fishID = line[8:20].strip()
-            if fishID == self.ARGS['USER']:
+            if fishID.lower() == self.ARGS['USER'].lower():
                 break
             currentFishList.append(fishID)
             if not fishID in self.fishList:
