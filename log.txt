@@ -14,6 +14,8 @@ Config 檔的檔名可以在執行主程式時加在參數中，如：python Moc
 (2) MochiCake.py -f filename.conf
     這樣會採用 filename.conf
 
+魚名單格式改為 log 檔完成
+
 # 20130311 #
 最近好累，對增加指令感到有點疲倦了，不過還是想做一個功能：踩地雷
 目前打算新增一個 MineSweeper.py 來做這個功能，雖然不知道什麼時候才會有時間實作就是了

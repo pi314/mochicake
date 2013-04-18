@@ -117,7 +117,7 @@ class MochiCakeBot (object):
         open('fishes/'+self.board, 'a').close()
         self.fishList = []
         with open('fishes/'+self.board, 'r') as fishes:
-            self.fishList = ' '.join([i.strip() for i in fishes]).split()
+            self.fishList = [i.split()[0].strip() for i in fishes]
         if len(self.fishList) == 0:
             print '名單為空'
         else:
@@ -138,10 +138,6 @@ class MochiCakeBot (object):
                 fishes = open('fishes/'+self.board, 'a')
                 fishes.write(fishID + ' ' + tools.getTimeStr() + '\n')
                 fishes.close()
-
-    def checkNewCommand (self):
-        if self.lines[-1].startswith('★'+self.ARGS['MASTER']):
-            self.cmdBuffer = ' '.join(self.lines[-1].split()[1:])
 
     def logout (self):
         self.setState('LOGOUT')
@@ -166,16 +162,6 @@ class MochiCakeBot (object):
             self.term_comm('\x1b\x5b\x44')  # 左
         print '完成'
 
-    def runCommand (self, cmd):
-        if cmd == 'end':
-            self.setState('WATCH')
-        if cmd == 'logout':
-            self.logout()
-        else:
-            print '不懂>"<'
-        # 把已執行的 commans 洗掉
-        self.cmdBuffer = ''
-        
     def watch (self):
         self.term_comm()
 
