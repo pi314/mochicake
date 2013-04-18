@@ -1,4 +1,6 @@
+#!/usr/local/bin/python
 # -*- coding: utf-8 -*-
+import argparse
 import sys
 import re
 import bsdconv
@@ -23,6 +25,12 @@ class MochiCakeBot (object):
         self.board = None
         self.lines = []
         self.fishList = []
+        self.cmdBuffer = ''
+        self.boardFaultTolerance = False
+
+    def setInitialMovement (self):
+        self.setState('WATCH')
+        self.board = self.ARGS['BOARD']
 
     def term_comm (self, w=None, wait=None):
         """ 寫入連線、將回傳內容放進虛擬終端機緩衝區、取得目前虛擬終端機的畫面 """
@@ -47,7 +55,7 @@ class MochiCakeBot (object):
         time.sleep(0.1)
         return ret
 
-    def getArguments (self, args):
+    def setArguments (self, args):
         self.ARGS = args
 
     def login (self, station):
@@ -72,7 +80,6 @@ class MochiCakeBot (object):
     def setState (self, newState):
         if self.state == newState:
             return
-
         if newState == 'WATCH':
             s = '看魚~'
         elif newState == 'WAIT_COMMAND':
@@ -86,7 +93,7 @@ class MochiCakeBot (object):
         else:
             s = '不懂>"<'
 
-        inList = self.lines[0].startswith('【網友列表】')
+        inList = (self.checkPosition() == 'LIST')
 
         if not inList:
             self.term_comm('\x15')
@@ -100,45 +107,7 @@ class MochiCakeBot (object):
         if not inList:
             self.term_comm('\x1b\x5b\x44')  # 左
 
-    def setMovement (self, movement):
-        self.movement = movement
-
-    def nextMovement (self):
-        return self.movement
-
-    def goWatch (self, dest=None):
-        if dest == None:
-            dest = self.board
-        self.__enterBoard__(dest)
-        self.__startWatch__()
-
-    def __enterBoard__ (self, dest):
-        while True:
-            try:
-                print '回到主選單'
-                while self.__checkPosition__() != 'MAIN':
-                    self.term_comm('\x1b\x5b\x44')  # 左
-                print '進入 '+dest
-                self.setState('MOVING')
-                self.board = dest
-                self.term_comm('s%s\n' % self.board)
-                if '錯誤的看板名稱' in self.lines[15]:
-                    print '錯誤: '+dest+' 無法進入'
-                    if dest == self.ARGS['BOARD']:
-                        print '程式結束'
-                        exit()
-                    else:
-                        print '回到預設板: '+self.ARGS['BOARD']
-                        self.__enterBoard__(self.ARGS['BOARD'])
-                        return
-                print '完成'
-                self.__loadFishList__()
-                return
-            except KeyboardInterrupt:
-                print '在 enterBoard 中按下 ^C'
-                self.CLI()
-
-    def __loadFishList__ (self):
+    def loadFishList (self):
         print '載入記錄 (fishes/%s)...' % self.board
         if not os.path.exists('fishes'):
             os.mkdir('fishes')
@@ -156,150 +125,30 @@ class MochiCakeBot (object):
                 print i
         print '完成'
 
-    def __startWatch__ (self):
-        while True:
-            try:
-                print '開始看魚'
-                self.setState('WATCH')
-                self.term_comm('\x15')   #打開使用者名單
-                listPositionError = False
-                while True:
-                    if not self.__checkPosition__() == 'LIST':
-                        while not self.__checkPosition__() == 'MAIN':
-                            self.term_comm('\x1b\x5b\x44')  # 左
-                        self.term_comm('\x15')              # 打開使用者名單
 
-                    if self.lines[-1].startswith('★'+self.ARGS['MASTER']):
-                        cmd = ' '.join(self.lines[-1].split()[1:])
-                        self.waitCommand(cmd)
-                        self.term_comm('s')
-
-                    # 刷新使用者名單
-                    self.term_comm('s')
-
-                    if self.lines[-1].startswith('★'+self.ARGS['MASTER']):
-                        cmd = ' '.join(self.lines[-1].split()[1:])
-                        self.waitCommand(cmd)
-                        self.term_comm('s')
-
-                    while not self.lines[3].startswith('     1'):
-                        listPositionError = True
-                        print '使用者名單的位置錯誤，試著回到第一頁'
-                        for i in self.lines:
-                            print i
-                        self.term_comm('2\r')
-                        for i in self.lines:
-                            print i
-
-                    if listPositionError:
-                        print '使用者名單的位置已正確，繼續看魚'
-                        listPositionError = False
-
-                    self.__checkNewFish__()
-                    if self.__checkCommand__():
-                        self.waitCommand(cmd)
-                        self.term_comm('s')
-            except KeyboardInterrupt:
-                print '在 startwatch 中按下 ^C'
-                self.CLI()
-
-    def __checkNewFish__ (self):
+    def checkNewFish (self):
         for line in self.lines[3:]:
             fishID = line[8:20].strip()
             if fishID == self.ARGS['USER']:
                 break
             elif not fishID in self.fishList:
                 '''Got a new fish!'''
-                print '發現新魚 : \033[1;31m'+fishID+'\033[m'
+                print '發現新魚 : \033[1;31m'+fishID+'\033[m  ' + tools.getTimeStr()
                 self.fishList.append(fishID)
                 fishes = open('fishes/'+self.board, 'a')
-                fishes.write(fishID+'\n')
+                fishes.write(fishID + ' ' + tools.getTimeStr() + '\n')
                 fishes.close()
 
-    def __checkCommand__ (self):
-        for line in self.lines[3:]:
-            fishID = line[8:20].strip()
-            #找到 master, 看有沒有指令
-            if fishID == self.ARGS['MASTER']:
-                words = line.split()
-                if words[-2] == 'MochiCake':
-                    return True
-                else:
-                    return False
-                break
-        # 沒有找到 MASTER
-        return False
-
-    def waitCommand (self, command=None):
-        self.setState('WAIT_COMMAND')
-        self.term_comm()
-        if not self.lines[0].startswith('【網友列表】'):
-            self.term_comm('\x15')   #打開使用者名單
-        if command != None:
-            self.__processCommandFromMaster__(command)
-        self.term_comm('s')
-        print '進入 while loop'
-
-        while True:
-            self.term_comm()
-            if self.lines[-1].startswith('★'+self.ARGS['MASTER']):
-                # 有水球!
-                print '指令'
-                cmd = ' '.join(self.lines[-1].split()[1:])
-                if cmd == 'end':
-                    print 'end 指令'
-                    self.setMovement('WATCH')
-                    self.setState('WATCH')
-                    return
-                self.__processCommandFromMaster__(cmd)
-                self.term_comm('s')     # 把水球按掉
-
-    def __processCommandFromMaster__ (self, cmd):
-        print '接收到指令 ['+cmd+']'
-        if cmd == 'logout':
-            self.logout()
-        elif cmd == 'hello':
-            self.__water__(self.ARGS['MASTER'], '哈囉>ω<')
-        elif cmd == 'list':
-            self.__mailListToMaster__()
-        elif cmd == 'where':
-            self.__water__(self.ARGS['MASTER'], '現在在 '+self.board+' 唷~')
-        elif cmd.startswith('goto '):
-            self.__enterBoard__(cmd[5:])
-            self.term_comm('\x15')   #打開使用者名單
-            self.setState('COMPLETE')
-            time.sleep(1)
-            self.setState('WAIT_COMMAND')
-        else:
-            self.__water__(self.ARGS['MASTER'], '不懂>"<')
-
-    def __water__ (self, target, message):
-        print '開始試著丟水球給 '+target
-        if not self.__checkPosition__() == 'LIST':
-            self.term_comm('\x15')   #打開使用者名單
-
-        for line in self.lines[3:]:
-            targetID = line[8:20].strip()
-            if targetID == target:
-                print '找到 ' + target
-                fishNum = line[0:6].strip()
-                print '試著送出訊息 '+message
-                self.term_comm(fishNum+'\n')
-                self.term_comm('w'+message+'\n\n')
-                break
-
-    def CLI (self):
-        print 'CLI'
-        print 'Not implement yet'
-        exit()
-        pass
+    def checkNewCommand (self):
+        if self.lines[-1].startswith('★'+self.ARGS['MASTER']):
+            self.cmdBuffer = ' '.join(self.lines[-1].split()[1:])
 
     def logout (self):
         self.setState('LOGOUT')
         time.sleep(1)
         exit()
 
-    def __checkPosition__ (self):
+    def checkPosition (self):
         self.term_comm()
         if self.lines[0].startswith('【網友列表】'):
             return 'LIST'
@@ -310,47 +159,110 @@ class MochiCakeBot (object):
         elif self.lines[0].startswith('【電子郵件】'):
             return 'MAIL'
         return 'UNKNOWN'
-    def __mailListToMaster__ (self):
-        self.setState('MOVING')
-        while (self.__checkPosition__() != 'MAIN'):
+
+    def gotoMainList (self):
+        print '回到主選單'
+        while self.checkPosition() != 'MAIN':
             self.term_comm('\x1b\x5b\x44')  # 左
-        print '已回到主選單'
-        print '進入寄信選單'
-        self.term_comm('m\n')
-        if (self.__checkPosition__() != 'MAIL'):
-            print '位置錯誤，預期在郵件選單，卻在 '+self.__checkPosition__()
-            term_comm('\x15')    #打開使用者名單
-            return
-        self.term_comm('m\n')           # 寄信~
         print '完成'
-        print '收信人: '+self.ARGS['MASTER']
-        self.term_comm(self.ARGS['MASTER']+'\n')    # 收信人
-        self.term_comm('[名單] '+self.board+'\n')   # 主旨
-        s = '\n'.join(tools.flatList(self.fishList, 5))
-        self.term_comm(s)
-        self.term_comm('\x18\n\n\n')         # 存檔
-        self.goWatch(self.board)
-        self.setState('COMPLETE')
-        pass
+
+    def runCommand (self, cmd):
+        if cmd == 'end':
+            self.setState('WATCH')
+        if cmd == 'logout':
+            self.logout()
+        else:
+            print '不懂>"<'
+        # 把已執行的 commans 洗掉
+        self.cmdBuffer = ''
+        
+    def watch (self):
+        self.term_comm()
+
+        # 板名不正確
+        if not self.boardFaultTolerance and not '\xe3\x80\x8a'+self.board+'\xe3\x80\x8b' in self.lines[0]:
+            print '板名不正確，預期目前應在 ' + self.board
+            print self.lines[0]
+            print ''
+            self.gotoMainList()
+            print '進入 '+self.board
+            self.term_comm('s'+self.board+'\n')
+            # 如果進不去
+            if '錯誤的看板名稱' in self.lines[12]:
+                print '無法進入 ' + self.board
+                print '請檢查是否為板名打錯，或是該板為好友板或秘密板'
+                exit()
+            if not '\xe3\x80\x8a'+self.board+'\xe3\x80\x8b' in self.lines[0]:
+                print '警告：板名和設定不符，無法確定是否正確'
+                print '預期為 ' + self.board
+                print '實際為 ' + self.lines[0]
+                self.boardFaultTolerance = True
+            print '完成'
+            self.loadFishList()
+        
+        # 位置不正確
+        if not self.checkPosition() == 'LIST':
+            print '位置不正確，預期目前應在使用者名單'
+            print self.lines[0]
+            print ''
+            self.gotoMainList()
+            self.term_comm('\x15')    #打開使用者名單
+            print '開始看魚'
+        
+        # 刷新使用者名單
+        self.term_comm('s')
+
+        listPositionError = False
+        while not self.lines[3].startswith('     1'):
+            listPositionError = True
+            print '使用者名單的位置錯誤，試著回到第一頁'
+            for i in self.lines:
+                print i
+            self.term_comm('2\r')
+            for i in self.lines:
+                print i
+
+        if listPositionError:
+            print '使用者名單的位置已正確，繼續看魚'
+            listPositionError = False
+
+        self.checkNewFish()
+
+    def waitCommand (self):
+        self.term_comm()
+        if not self.checkPosition() == 'LIST':
+            self.term_comm('\x15')   #打開使用者名單
+        if self.cmdBuffer != '':
+            self.runCommand(self.cmdBuffer)
+
+        self.checkNewCommand()
+
+    def work (self):
+        while True:
+            if self.state == 'WATCH':
+                self.watch()
 
 def main ():
-    c = ConfLoader.ConfLoader()
-    MochiCake = MochiCakeBot()
-    args = c.loadConf('MochiCake.conf')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', default='MochiCake.conf')
+    #parser.add_argument('-h', default='MochiCake.conf')
+
+    CONFIG_FILE_NAME = parser.parse_args(sys.argv[1:]).f
+
+    if CONFIG_FILE_NAME == 'MochiCake.conf':
+        print '未指定設定檔，尋找預設設定檔 MochiCake.conf'
+    else:
+        print '使用設定檔 ' + CONFIG_FILE_NAME
+
+    args = ConfLoader.loadConf(CONFIG_FILE_NAME)
     if args == False:
         print '程式結束'
         exit()
-    MochiCake.getArguments(args)
+    MochiCake = MochiCakeBot()
+    MochiCake.setArguments(args)
     MochiCake.login('bs2.to')
-
-    MochiCake.setMovement('WATCH')
-    MochiCake.board = MochiCake.ARGS['BOARD']
-    while True:
-        nm = MochiCake.nextMovement()
-        if nm == 'WATCH':
-            MochiCake.goWatch()
-        elif nm == 'WAIT_COMMAND':
-            MochiCake.waitCommand()
+    MochiCake.setInitialMovement()
+    MochiCake.work()
 
 if __name__ == '__main__':
     main()

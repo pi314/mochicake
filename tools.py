@@ -1,3 +1,4 @@
+import time
 def flatList (inputList, width):
     maxLength = max([len(i) for i in inputList])
     ret = []
@@ -7,3 +8,5 @@ def flatList (inputList, width):
         ret.append(tempStr)
     return ret
 
+def getTimeStr ():
+    return time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())

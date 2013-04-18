@@ -1,3 +1,31 @@
+# 20130418 #
+哇啊，封印了好久呢，昨天因為 Q 的關係又拿出來檢查了一下，決定再做點小修改，以正式能使用為目標。
+近期目標：能抓魚、儘量保留魚的資訊(包括抓到的時間)、把魚的名單改為 log 檔的用途等等。
+先把指令功能移除掉，如果之後有需要的話，改用故鄉下指令。
+修改 ConfLoader.py，之前的寫法是需要先建立一個 ConfLoader 物件，再呼叫這個 instance 的 loadConf()。
+改把 ConfLoader 當成一個 Module 使用，直接呼叫 ConfLoader.loadConf(fileName) 即可。
+Config 檔的檔名可以在執行主程式時加在參數中，如：python MochiCake.py -c MochiCake.conf。
+這樣就可以在同一個目錄下執行好幾個 MochiCake 的 instance，各自使用不同的 Config。
+另外，因為 fishes 之後要做成 log 檔的格式，所以一行只能放一個 ID 了，待改。
+
+感謝 xatier，argparser 的功能已做好，現在執行主程式有兩種方式：
+(1) MochiCake.py
+    這樣會自動尋找 MochiCake.conf
+(2) MochiCake.py -f filename.conf
+    這樣會採用 filename.conf
+
+# 20130311 #
+最近好累，對增加指令感到有點疲倦了，不過還是想做一個功能：踩地雷
+目前打算新增一個 MineSweeper.py 來做這個功能，雖然不知道什麼時候才會有時間實作就是了
+
+# 20130305 #
+越看越覺得之前有很多 __函式__ 很不好看，所以再度重新修改架構
+這次是使用 state 加上一個大迴圈，效率好像變差了些，但是開發起來應該會比較容易
+現在已經可以看魚、可以從畫面看自己的位置、可以檢查使用者名單有沒有錯頁
+
+啊啊啊啊玩太晚了，沒改 code 反而寫了個 Morse Code 解碼器OAO
+讓 MochiCake 可以講 Morse Code 算了(誤
+
 # 20130304 #
 剛剛才發現原來有好多次的日誌都打成 2012 年了
 小修改了架構，還沒有改乾淨
