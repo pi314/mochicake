@@ -125,19 +125,21 @@ class MochiCakeBot (object):
                 print i
         print '完成'
 
-
     def checkNewFish (self):
+        currentFishList = []
         for line in self.lines[3:]:
             fishID = line[8:20].strip()
             if fishID == self.ARGS['USER']:
                 break
-            elif not fishID in self.fishList:
+            currentFishList.append(fishID)
+            if not fishID in self.fishList:
                 '''Got a new fish!'''
-                print '發現新魚 : \033[1;31m'+fishID+'\033[m  ' + tools.getTimeStr()
+                print '有魚上勾了！ \033[1;31m'+fishID+'\033[m  ' + tools.getTimeStr()
                 self.fishList.append(fishID)
                 fishes = open('fishes/'+self.board, 'a')
                 fishes.write(fishID + ' ' + tools.getTimeStr() + '\n')
                 fishes.close()
+        self.fishList = currentFishList
 
     def logout (self):
         self.setState('LOGOUT')
@@ -184,7 +186,7 @@ class MochiCakeBot (object):
                 print '實際為 ' + self.lines[0]
                 self.boardFaultTolerance = True
             print '完成'
-            self.loadFishList()
+            #self.loadFishList()
         
         # 位置不正確
         if not self.checkPosition() == 'LIST':
