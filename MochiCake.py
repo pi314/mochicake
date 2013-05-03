@@ -52,7 +52,7 @@ class MochiCakeBot (object):
         #sys.stdout.write("\x1b[2J\x1b[H") #清空畫面，將游標移至左上角
         #sys.stdout.write(ret)
         #time.sleep(1)
-        time.sleep(0.1)
+        time.sleep(0.5)
         return ret
 
     def setArguments (self, args):
